@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
 
@@ -10,7 +11,7 @@ exports.createRoom = async (req, res) => {
 // Get Available Rooms
 exports.getAvailableRooms = async (req, res) => {
   const rooms = await Room.find({ isAvailable: true });
-  res.json(rooms);
+  res.json({ results: rooms });
 };
 
 // ✅ Get available rooms by date
@@ -59,6 +60,7 @@ exports.getAvailableRoomsByDate = async (req, res) => {
 exports.getRoomById = async (req, res) => {
   try {
     const { roomId } = req.params;
+    console.log(roomId, "roomId.>>>>>>>>>>>>>.");
 
     // 🔴 Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(roomId)) {
