@@ -19,6 +19,9 @@ async function sendTestEmail() {
   try {
     const result = await sendNotification(testGuest);
 
+
+    console.log("📊 Result:>>>>>>>>>>>>" ,result);
+
     if (result.emailSent) {
       console.log("✅ SUCCESS: Email sent to anupam@tarality.com!");
       console.log("📧 Message ID:", result.emailInfo?.messageId);
