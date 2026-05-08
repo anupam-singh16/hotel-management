@@ -1,5 +1,6 @@
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
+const { sendNotification } = require("../services/notificationService");
 
 exports.checkIn = async (req, res) => {
   try {
@@ -129,6 +130,96 @@ exports.getBookedRoomsByDate = async (req, res) => {
     res.json({
       count: bookings.length,
       data: bookings,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ✅ Send checkout reminders (checks bookings with checkout in next 2 hours)
+exports.sendCheckoutReminders = async (req, res) => {
+  try {
+    const now = new Date();
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+    // Find all checked-in bookings with checkout time within next 2 hours
+    const bookingsForReminder = await Booking.find({
+      status: "checked-in",
+      checkOutDate: {
+        $gte: now,
+        $lte: twoHoursFromNow,
+      },
+    }).populate("room");
+
+    if (bookingsForReminder.length === 0) {
+      return res.json({
+        message: "No bookings require checkout reminder",
+        count: 0,
+        notifications: [],
+      });
+    }
+
+    // Send notifications to all guests checking out soon
+    const notifications = [];
+    for (const booking of bookingsForReminder) {
+      try {
+        const notification = await sendNotification({
+          guestName: booking.guestName,
+          checkOutDate: booking.checkOutDate,
+          roomNumber: booking.room?.roomNumber || "Unknown",
+          guestEmail: booking.guestEmail,
+        });
+        
+        // Mark reminder as sent
+        booking.reminderSent = true;
+        await booking.save();
+        
+        notifications.push({
+          bookingId: booking._id,
+          guestName: booking.guestName,
+          notification,
+        });
+      } catch (error) {
+        console.error(`Failed to send notification for ${booking.guestName}:`, error.message);
+      }
+    }
+
+    res.json({
+      message: "Checkout reminders sent successfully",
+      count: notifications.length,
+      bookingsCount: bookingsForReminder.length,
+      notifications: notifications,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ✅ Get bookings with checkout within 2 hours (without sending notifications)
+exports.getCheckoutReminders = async (req, res) => {
+  try {
+    const now = new Date();
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+    const bookingsForReminder = await Booking.find({
+      status: "checked-in",
+      checkOutDate: {
+        $gte: now,
+        $lte: twoHoursFromNow,
+      },
+    }).populate("room");
+
+    res.json({
+      message: "Bookings with checkout in next 2 hours",
+      count: bookingsForReminder.length,
+      data: bookingsForReminder,
+      checkTime: now,
+      reminderWindow: {
+        from: now,
+        to: twoHoursFromNow,
+      },
     });
   } catch (error) {
     console.error(error);
